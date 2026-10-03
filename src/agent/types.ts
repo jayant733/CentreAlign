@@ -141,6 +141,12 @@ export interface ToolDefinition<A = any> {
   description: string;
   parameters: z.ZodType<A>;
   risk: ToolRisk;
+  /**
+   * Schema to advertise to the model, when it cannot be derived from
+   * `parameters`. MCP servers publish JSON Schema directly, so their tools
+   * supply it here and keep a permissive Zod type for local validation.
+   */
+  rawJsonSchema?: Record<string, unknown>;
   /** Where the tool came from. Local tools and MCP-discovered tools are
    *  treated identically by the loop. */
   origin?: { kind: "builtin" } | { kind: "mcp"; server: string };
