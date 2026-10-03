@@ -32,6 +32,11 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
+
+# praxis runtime state: sqlite databases, screenshots, generated invoice PDFs
+/.data/
+/public/artifacts/
 
 # vercel
 .vercel
