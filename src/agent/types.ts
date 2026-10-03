@@ -141,6 +141,8 @@ export interface ToolDefinition<A = any> {
   description: string;
   parameters: z.ZodType<A>;
   risk: ToolRisk;
+  /** For dangerous tools: the consequence in plain words, shown to the approver. */
+  describeConsequence?: (args: A) => string;
   /**
    * Schema to advertise to the model, when it cannot be derived from
    * `parameters`. MCP servers publish JSON Schema directly, so their tools
@@ -150,7 +152,8 @@ export interface ToolDefinition<A = any> {
   /** Where the tool came from. Local tools and MCP-discovered tools are
    *  treated identically by the loop. */
   origin?: { kind: "builtin" } | { kind: "mcp"; server: string };
-  run(args: A, ctx: ToolContext): Promise<ToolResult>;
+  /** `approval` is set for dangerous tools: the human decision that let it run. */
+  run(args: A, ctx: ToolContext, approval?: ApprovalDecision): Promise<ToolResult>;
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
 

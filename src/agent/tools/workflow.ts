@@ -71,18 +71,18 @@ export const workflowTools: ToolDefinition[] = [
   {
     name: "pay_bill",
     description:
-      "Release a payment against a bill in NimbusERP. This moves money, cannot be undone, and " +
-      "always requires explicit human approval before it runs. Identify the bill by its supplier " +
-      "invoice number.",
+      "Release a payment against a bill in NimbusERP. This moves money and cannot be undone. " +
+      "Calling it pauses the run and asks a human to approve this exact payment, so do not ask " +
+      "for permission separately first. Identify the bill by its supplier invoice number.",
     risk: "dangerous",
+    describeConsequence: ({ invoice_number }) =>
+      `Release the payment for the bill on invoice ${invoice_number}. ` +
+      `Money leaves the account and this cannot be undone.`,
     parameters: z.object({
       invoice_number: z.string().min(1),
-      approved_by: z
-        .string()
-        .min(1)
-        .describe("Who authorised this, as told to you by the human approver"),
     }),
-    async run({ invoice_number, approved_by }): Promise<ToolResult> {
+    async run({ invoice_number }, _ctx, approval): Promise<ToolResult> {
+      const approved_by = approval?.note ?? "web approver";
       const res = await fetch(new URL("/api/sandbox/erp/payments", config.baseUrl), {
         method: "POST",
         headers: { "content-type": "application/json" },

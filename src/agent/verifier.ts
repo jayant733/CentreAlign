@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { artifacts } from "./db";
 import * as llm from "./llm";
 import { evidencePrompt, evidenceSystem, verifierPrompt, verifierSystem } from "./prompts";
 import type { ToolRegistry } from "./tools";
@@ -104,6 +105,20 @@ export async function gatherEvidence(input: {
 
     const result = await input.registry.execute(chosen.tool, chosen.args, input.ctx);
     latestObservation = result.observation;
+    for (const artifact of result.artifacts ?? []) artifacts.add(input.ctx.runId, artifact);
+    input.ctx.emit({
+      type: "action.result",
+      level: result.ok ? "info" : "warn",
+      message: `${chosen.tool} ${result.ok ? "succeeded" : `failed: ${result.error?.message ?? "unknown"}`}`,
+      data: {
+        phase: "verification",
+        tool: chosen.tool,
+        ok: result.ok,
+        error: result.error,
+        observation: result.observation.slice(0, 2000),
+        artifacts: result.artifacts ?? [],
+      },
+    });
     history.push(
       `- ${chosen.tool}(${JSON.stringify(chosen.args)}) → ${result.ok ? "ok" : "FAILED"}: ` +
         `${result.observation.replace(/\s+/g, " ").slice(0, 180)}`,

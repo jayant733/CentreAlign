@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { ToolContext, ToolDefinition, ToolErrorKind, ToolResult } from "../types";
+import type { ApprovalDecision, ToolContext, ToolDefinition, ToolErrorKind, ToolResult } from "../types";
 
 /**
  * The tool registry is the agent's entire capability surface. The loop knows
@@ -74,6 +74,7 @@ export class ToolRegistry {
     }
 
     // Irreversible actions never execute on the agent's own authority.
+    let approval: ApprovalDecision | undefined;
     if (tool.risk === "dangerous") {
       const decision = await ctx.requestApproval({
         tool: name,
@@ -91,10 +92,11 @@ export class ToolRegistry {
           error: { kind: "blocked", message: "Denied by human reviewer", retryable: false },
         };
       }
+      approval = decision;
     }
 
     try {
-      return await tool.run(parsed.data, ctx);
+      return await tool.run(parsed.data, ctx, approval);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       return {
@@ -107,8 +109,8 @@ export class ToolRegistry {
 }
 
 function describeConsequence(tool: ToolDefinition, args: unknown): string {
-  const pretty = JSON.stringify(args, null, 2);
-  return `${tool.name} will run with:\n${pretty}\n\n${tool.description}`;
+  if (tool.describeConsequence) return tool.describeConsequence(args);
+  return `Run ${tool.name}, which is marked irreversible. ${tool.description}`;
 }
 
 export function classify(message: string): ToolErrorKind {
