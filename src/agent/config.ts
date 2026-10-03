@@ -36,10 +36,52 @@ export const config = {
   /** The only directory file tools may touch. */
   workspaceDir: path.join(dataDir, "workspace"),
 
+  /**
+   * Model routing.
+   *
+   * Measured on the Gemini free tier: the flagship flash models allow 5
+   * requests per minute, the lite models 15. A single task makes on the order
+   * of 40 model calls, so putting everything on the flagship makes a run take
+   * eight minutes of pure waiting.
+   *
+   * So calls are routed by stakes against frequency. The actor fires on every
+   * turn and is the bulk of the traffic, but each individual decision is
+   * low-stakes and heavily constrained by the prompt — it goes on the fast
+   * model. Planning, judging a step and verifying the outcome happen a handful
+   * of times per run and are where a wrong answer is expensive, so they get
+   * the strongest model the quota allows.
+   */
   llm: {
     apiKey: str("GEMINI_API_KEY", ""),
-    model: str("PRAXIS_MODEL", "gemini-2.5-flash"),
-    fastModel: str("PRAXIS_MODEL_FAST", "gemini-2.5-flash-lite"),
+    tiers: {
+      /** Planner, critic, verifier. Few calls, high consequence. */
+      reasoning: {
+        model: str("PRAXIS_MODEL_REASONING", "gemini-3.8-flash"),
+        rpm: num("PRAXIS_RPM_REASONING", 5),
+      },
+      /** The actor loop and evidence gathering. Many calls. */
+      action: {
+        model: str("PRAXIS_MODEL_ACTION", "gemini-3.5-flash-lite"),
+        rpm: num("PRAXIS_RPM_ACTION", 15),
+      },
+      /** Mechanical summarising. */
+      fast: {
+        model: str("PRAXIS_MODEL_FAST", "gemini-3.5-flash-lite"),
+        rpm: num("PRAXIS_RPM_FAST", 15),
+      },
+    },
+    /**
+     * Tried in order when a tier's model is overloaded (503) or out of quota
+     * (429). Free-tier quotas are per model, so falling back also raises the
+     * total calls per minute available to a run.
+     */
+    fallbacks: str(
+      "PRAXIS_MODEL_FALLBACKS",
+      "gemini-3.5-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-flash-lite-latest",
+    )
+      .split(",")
+      .map((m) => m.trim())
+      .filter(Boolean),
   },
 
   baseUrl: str("PRAXIS_BASE_URL", "http://localhost:3000"),

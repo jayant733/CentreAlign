@@ -246,13 +246,14 @@ export const browserTools: ToolDefinition[] = [
     }),
     async run({ direction }, ctx) {
       const page = await ctx.browser.page();
-      await page.evaluate((dir: string) => {
-        const h = window.innerHeight * 0.8;
-        if (dir === "down") window.scrollBy(0, h);
-        else if (dir === "up") window.scrollBy(0, -h);
-        else if (dir === "top") window.scrollTo(0, 0);
-        else window.scrollTo(0, document.body.scrollHeight);
-      }, direction);
+      const scripts: Record<string, string> = {
+        down: "window.scrollBy(0, window.innerHeight * 0.8)",
+        up: "window.scrollBy(0, -window.innerHeight * 0.8)",
+        top: "window.scrollTo(0, 0)",
+        bottom: "window.scrollTo(0, document.body.scrollHeight)",
+      };
+      const script = scripts[String(direction)];
+      await page.evaluate(script);
       await page.waitForTimeout(200);
       const { obs, shot } = await snapshot(page, ctx, `Scrolled ${direction}`);
       return result(renderObservation(obs), `Scrolled ${direction}.`, shot);

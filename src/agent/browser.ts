@@ -227,7 +227,12 @@ export async function observe(page: Page): Promise<Observation> {
   // `domcontentloaded` rather than `networkidle`: this app streams, and
   // waiting for idle hangs on pages that keep a connection open.
   await page.waitForLoadState("domcontentloaded").catch(() => {});
-  const raw = await page.evaluate(collect);
+  // Sent as source text with a no-op `__name`: esbuild (used by tsx and the
+  // Next dev server) wraps functions in a `__name()` helper that exists in
+  // Node but not in the page, so passing `collect` directly throws there.
+  const raw = (await page.evaluate(
+    `(() => { const __name = (f) => f; return (${collect.toString()})(); })()`,
+  )) as ReturnType<typeof collect>;
 
   let text = raw.text.replace(/\t/g, " | ").replace(/\n{3,}/g, "\n\n").trim();
   if (text.length > MAX_TEXT) {

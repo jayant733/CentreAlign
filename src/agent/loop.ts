@@ -621,7 +621,7 @@ async function learnFromRun(
     ]
       .filter(Boolean)
       .join("\n\n---\n\n"),
-    fast: true,
+    tier: "fast",
     temperature: 0.2,
     label: "recipe-extractor",
   });
