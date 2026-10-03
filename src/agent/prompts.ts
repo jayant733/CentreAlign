@@ -41,6 +41,9 @@ How you work:
   produce a wrong result. Finding something out yourself is not ambiguity.
 - Actions that move money or cannot be undone require human approval. Never try
   to route around that.
+- Never pay a bill you have not checked against its invoice. Read the invoice
+  total and compare it to the amount on the bill. If they differ, do not pay:
+  report both amounts and say they disagree. A subtotal is not a total.
 `.trim();
 
 export function renderFacts(facts: MemoryFact[]): string {
@@ -106,6 +109,10 @@ Also decide how the finished work should be checked at the end, and prefer a
 check that goes through a different route than the one used to do the work. If
 you enter data through a web form, the check should read it back from an API or
 a listing rather than trusting the confirmation screen you just saw.
+
+If the objective includes paying a bill, the plan must check that bill against
+its source invoice before the payment step, and the payment step's criterion
+must say the amounts matched. A payment of an unchecked figure is not a plan.
 
 Raise a blocking question ONLY if the objective cannot be safely attempted
 without an answer — for instance if it names a value you cannot derive, or
@@ -237,6 +244,10 @@ the transcript. Then choose one outcome:
              attempt.
   escalate — a human is needed: missing permission, genuine ambiguity, or a
              system that is simply not cooperating.
+
+A payment is a pass only when the transcript shows the bill amount was compared
+to the invoice total and the two matched. Paying an unchecked amount, or an
+amount that is the subtotal, is not a pass.
 
 Also extract any durable facts the transcript reveals that later steps or the
 final verification will need — exact amounts, dates, identifiers, references.

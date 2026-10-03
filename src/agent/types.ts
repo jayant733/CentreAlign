@@ -144,6 +144,12 @@ export interface ToolDefinition<A = any> {
   /** For dangerous tools: the consequence in plain words, shown to the approver. */
   describeConsequence?: (args: A) => string;
   /**
+   * Runs before a dangerous tool asks for approval. A returned result means
+   * the action is refused outright, so a human is never asked to approve
+   * something the system already knows is wrong.
+   */
+  precheck?: (args: A) => Promise<ToolResult | null> | ToolResult | null;
+  /**
    * Schema to advertise to the model, when it cannot be derived from
    * `parameters`. MCP servers publish JSON Schema directly, so their tools
    * supply it here and keep a permissive Zod type for local validation.

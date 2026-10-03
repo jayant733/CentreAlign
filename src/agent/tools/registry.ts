@@ -73,6 +73,11 @@ export class ToolRegistry {
       };
     }
 
+    if (tool.precheck) {
+      const refused = await tool.precheck(parsed.data);
+      if (refused) return refused;
+    }
+
     // Irreversible actions never execute on the agent's own authority.
     let approval: ApprovalDecision | undefined;
     if (tool.risk === "dangerous") {

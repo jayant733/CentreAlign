@@ -1,0 +1,10 @@
+{
+  "servers": {
+    "example": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-everything"],
+      "disabled": true,
+      "dangerousTools": []
+    }
+  }
+}

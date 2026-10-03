@@ -490,6 +490,13 @@ export const interventions = {
     return row ? toIntervention(row) : null;
   },
 
+  forRun(runId: string): InterventionRecord[] {
+    const rows = db
+      .prepare(`SELECT * FROM interventions WHERE run_id = ? ORDER BY created_at`)
+      .all(runId) as RunRow[];
+    return rows.map(toIntervention);
+  },
+
   pendingForRun(runId: string): InterventionRecord[] {
     const rows = db
       .prepare(`SELECT * FROM interventions WHERE run_id = ? AND status = 'pending' ORDER BY created_at`)

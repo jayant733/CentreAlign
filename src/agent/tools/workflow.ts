@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { config } from "../config";
+import { bills, invoices, money } from "@/sandbox/db";
 import type { ToolDefinition, ToolResult } from "../types";
 
 /**
@@ -78,6 +79,22 @@ export const workflowTools: ToolDefinition[] = [
     describeConsequence: ({ invoice_number }) =>
       `Release the payment for the bill on invoice ${invoice_number}. ` +
       `Money leaves the account and this cannot be undone.`,
+    precheck({ invoice_number }) {
+      const bill = bills.byInvoiceNumber(invoice_number);
+      const invoice = invoices.byNumber(invoice_number);
+      if (!bill || !invoice || bill.amountCents === invoice.totalCents) return null;
+      const billAmount = money(bill.amountCents, bill.currency);
+      const invoiceTotal = money(invoice.totalCents, invoice.currency);
+      const subtotal = money(invoice.subtotalCents, invoice.currency);
+      return {
+        ok: false,
+        observation:
+          `Refusing to pay ${invoice.number}. The bill in NimbusERP is ${billAmount}, but the ` +
+          `invoice total is ${invoiceTotal} (subtotal ${subtotal}). The two do not match, so the ` +
+          `payment was not requested and no approval was asked. Report the disagreement, with both amounts.`,
+        error: { kind: "blocked", message: "Bill amount does not match the invoice total", retryable: false },
+      };
+    },
     parameters: z.object({
       invoice_number: z.string().min(1),
     }),
