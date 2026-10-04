@@ -4,6 +4,8 @@ An autonomous worker for operations tasks. You describe the job in a sentence. P
 
 The company it works in is synthetic. Northwind Manufacturing, its vendors, invoices and ledger all run locally. Nothing here talks to a real business system.
 
+**[🚀 Live Demo](https://centrealign-production-5981.up.railway.app/) · [▶️ Watch Demo Video](https://drive.google.com/file/d/1tr_ofZaGO0NV9_uptQDgpaCxLvQN1Fro/view?usp=sharing)**
+
 ## Setup
 
 Node 22 or newer. Cases and the sandbox company are stored in Neon Postgres. Set `DATABASE_URL` in `.env` to the connection string. Invoice PDFs and screenshots still live on disk under `.data` and `public/artifacts`.
