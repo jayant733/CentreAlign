@@ -5,11 +5,11 @@
   "description": "Praxis - an autonomous AI task worker that plans, executes and verifies real work",
   "scripts": {
     "dev": "next dev",
-    "worker": "tsx --env-file=.env scripts/worker.ts",
-    "seed": "tsx --env-file=.env scripts/seed.ts",
-    "task": "tsx --env-file=.env scripts/cli.ts",
-    "eval": "tsx --env-file=.env scripts/eval.ts",
-    "mcp": "tsx --env-file=.env scripts/mcp-server.ts",
+    "worker": "tsx --env-file-if-exists=.env scripts/worker.ts",
+    "seed": "tsx --env-file-if-exists=.env scripts/seed.ts",
+    "task": "tsx --env-file-if-exists=.env scripts/cli.ts",
+    "eval": "tsx --env-file-if-exists=.env scripts/eval.ts",
+    "mcp": "tsx --env-file-if-exists=.env scripts/mcp-server.ts",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"

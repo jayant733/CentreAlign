@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { z } from "zod";
-import { config } from "../config";
+import { config, resolveTarget } from "../config";
 import type { ToolDefinition, ToolResult } from "../types";
 
 /** Keeps file tools inside the sandboxed workspace, whatever the model asks for. */
@@ -71,7 +71,7 @@ export const dataTools: ToolDefinition[] = [
     }),
     async run({ url }, ctx): Promise<ToolResult> {
       const page = await ctx.browser.page();
-      const target = url.startsWith("http") ? url : new URL(url, config.baseUrl).toString();
+      const target = resolveTarget(url);
 
       const response = await page.context().request.get(target, { timeout: 20_000 });
       const status = response.status();
@@ -133,7 +133,7 @@ export const dataTools: ToolDefinition[] = [
       headers: z.record(z.string(), z.string()).optional(),
     }),
     async run({ method, url, body, headers }): Promise<ToolResult> {
-      const target = url.startsWith("http") ? url : new URL(url, config.baseUrl).toString();
+      const target = resolveTarget(url);
 
       // Allowlist. The agent operates on internal systems only; it has no
       // business reaching the public internet, and saying so explicitly is

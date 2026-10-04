@@ -19,6 +19,52 @@ function bool(name: string, fallback: boolean): boolean {
 const root = process.cwd();
 const dataDir = path.join(root, ".data");
 
+/**
+ * Where the agent's own browser and HTTP tools reach the app. Hosts such as
+ * Railway pick the port, and the worker runs beside the web server, so a
+ * localhost address must follow PORT rather than assume 3000. A public URL
+ * set explicitly is used as given.
+ */
+function resolveBaseUrl(): string {
+  const port = str("PORT", "3000");
+  const explicit = str("PRAXIS_BASE_URL", "");
+  if (!explicit) return `http://127.0.0.1:${port}`;
+  try {
+    const url = new URL(explicit);
+    if (url.hostname === "localhost" || url.hostname === "127.0.0.1") {
+      return `${url.protocol}//127.0.0.1:${port}`;
+    }
+  } catch {
+    // Fall through and use the value as written.
+  }
+  return explicit.replace(/\/+$/, "");
+}
+
+/**
+ * Turn a tool argument into a URL the in-container browser can actually open.
+ * The model often repeats `http://localhost:3000/...` from an older brief.
+ * That port is wrong on Railway, so any localhost address is moved onto the
+ * origin this process is serving.
+ */
+export function resolveTarget(url: string): string {
+  if (!url.startsWith("http")) return new URL(url, config.baseUrl).toString();
+  try {
+    const target = new URL(url);
+    const base = new URL(config.baseUrl);
+    const local = target.hostname === "localhost" || target.hostname === "127.0.0.1";
+    const baseLocal = base.hostname === "localhost" || base.hostname === "127.0.0.1";
+    if (local && baseLocal) {
+      target.protocol = base.protocol;
+      target.hostname = base.hostname;
+      target.port = base.port;
+      return target.toString();
+    }
+  } catch {
+    // Use the value as written when it is not a URL we can rewrite.
+  }
+  return url;
+}
+
 export const config = {
   /** Repo root. All sandboxed file access is resolved relative to this. */
   root,
@@ -82,7 +128,7 @@ export const config = {
       .filter(Boolean),
   },
 
-  baseUrl: str("PRAXIS_BASE_URL", "http://localhost:3000"),
+  baseUrl: resolveBaseUrl(),
 
   browser: {
     headless: bool("PRAXIS_HEADLESS", false),

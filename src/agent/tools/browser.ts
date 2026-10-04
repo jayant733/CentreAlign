@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { Page } from "playwright";
 import { elementLocator, observe, renderObservation } from "../browser";
-import { config } from "../config";
+import { config, resolveTarget } from "../config";
 import type { ToolContext, ToolDefinition, ToolResult } from "../types";
 import { classify, isRetryable } from "./registry";
 
@@ -65,7 +65,7 @@ export const browserTools: ToolDefinition[] = [
     }),
     async run({ url }, ctx) {
       const page = await ctx.browser.page();
-      const target = url.startsWith("http") ? url : new URL(url, config.baseUrl).toString();
+      const target = resolveTarget(url);
       const response = await page.goto(target, { waitUntil: "domcontentloaded" });
       const status = response?.status() ?? 0;
 
