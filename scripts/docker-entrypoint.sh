@@ -17,13 +17,26 @@ case "${PRAXIS_BASE_URL:-}" in
 esac
 echo "[praxis] web on port ${PORT}, agent dials ${PRAXIS_BASE_URL}"
 
+npx next start -H 0.0.0.0 -p "${PORT}" &
+web_pid=$!
+
+# Wait until the web server is accepting connections before the worker starts.
+# Without this the worker's Playwright browser opens immediately and hits
+# ERR_CONNECTION_REFUSED on the sandbox portal.
+echo "[praxis] waiting for web server to be ready..."
+for i in $(seq 1 60); do
+  if curl -sf "http://127.0.0.1:${PORT}/api/health" >/dev/null 2>&1 \
+    || curl -sf "http://127.0.0.1:${PORT}" >/dev/null 2>&1; then
+    echo "[praxis] web server is ready."
+    break
+  fi
+  sleep 1
+done
+
 npx tsx scripts/seed-if-empty.ts
 
 npx tsx scripts/worker.ts &
 worker_pid=$!
-
-npx next start -H 0.0.0.0 -p "${PORT}" &
-web_pid=$!
 
 shutdown() {
   kill "$worker_pid" "$web_pid" 2>/dev/null || true
