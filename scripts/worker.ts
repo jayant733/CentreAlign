@@ -9,7 +9,7 @@ import type { ToolDefinition } from "@/agent/types";
  * The HTTP API only enqueues runs; this process executes them. Separating the
  * two is worth the extra terminal: a task takes minutes and drives a real
  * browser, which is not work that belongs inside a request handler, and
- * because all state lives in SQLite the UI stays fully live while the worker
+ * because all state lives in Postgres the UI stays fully live while the worker
  * grinds. It also means a crashed worker leaves an inspectable trail instead
  * of taking the web app down with it.
  */

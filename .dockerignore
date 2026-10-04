@@ -1,0 +1,11 @@
+node_modules
+.next
+.data
+public/artifacts
+.git
+.env
+.env.*
+!.env.example
+*.md
+agent-transcripts
+terminals

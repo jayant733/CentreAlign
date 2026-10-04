@@ -6,7 +6,7 @@ The company it works in is synthetic. Northwind Manufacturing, its vendors, invo
 
 ## Setup
 
-Node 22 or newer. The agent uses the built-in `node:sqlite`.
+Node 22 or newer. Cases and the sandbox company are stored in Neon Postgres. Set `DATABASE_URL` in `.env` to the connection string. Invoice PDFs and screenshots still live on disk under `.data` and `public/artifacts`.
 
 ```bash
 npm install
@@ -34,6 +34,30 @@ npm run task -- "Find the latest invoice from Acme, extract the total amount pay
 
 The CLI asks you directly when the agent needs an approval or an answer.
 
+## Docker
+
+The image runs the web server and the worker together. Both talk to Neon through `DATABASE_URL`. The volume only keeps invoice PDFs, screenshots and the workspace. Seeding runs only when the sandbox has no vendors. `npm run seed` deletes the company and rebuilds it.
+
+```bash
+docker compose up --build
+```
+
+`GEMINI_API_KEY` is read from the shell or from a `.env` file next to `docker-compose.yml`. Open http://localhost:3000.
+
+A single container without Compose:
+
+```bash
+docker build -t praxis .
+docker run -d -p 3000:3000 \
+  -v praxis_data:/app/.data \
+  -e GEMINI_API_KEY="your_key" \
+  -e DATABASE_URL="your_neon_url" \
+  -e PRAXIS_BASE_URL="http://localhost:3000" \
+  --name praxis-app praxis
+```
+
+Playwright's browser runs inside the container, so `PRAXIS_BASE_URL` should stay `http://localhost:3000` unless a proxy in front of the app is the only way the browser can reach it. If a proxy sits in front, disable response buffering for `/api/runs/*/events` or the live trail will arrive in one chunk at the end.
+
 ## What a run actually does
 
 1. The planner turns the sentence into steps. Each step has a success criterion another person could check by looking.
@@ -47,7 +71,7 @@ Payments never run on the agent's authority. `pay_bill` stops and asks. If the a
 ## Architecture
 
 ```
-browser  →  POST /api/runs   →  SQLite (.data/praxis.db)
+browser  →  POST /api/runs   →  Neon (schema agent)
                                       ↑
 worker (scripts/worker.ts) ───────────┘  →  Playwright, sandbox HTTP
                                       ↓
@@ -56,7 +80,7 @@ browser  ←  SSE /api/runs/:id/events
 
 The API only enqueues. A task drives a real browser for minutes, which does not belong inside a request. The UI tails the events table, so it stays live while the worker runs in another process.
 
-The sandbox is a second database (`.data/sandbox.db`) and a set of ordinary Next.js pages: a vendor portal with a login, a cookie wall, paging and PDFs, and NimbusERP with a strict bill form and a read API. The agent reaches them the way an employee would. It is not given the quirks. The portal lists amounts without tax, sorts by invoice number rather than date, and fails the first PDF download. The agent has to notice.
+The sandbox is a second schema (`sandbox`) in the same Neon database, plus a set of ordinary Next.js pages: a vendor portal with a login, a cookie wall, paging and PDFs, and NimbusERP with a strict bill form and a read API. The agent reaches them the way an employee would. It is not given the quirks. The portal lists amounts without tax, sorts by invoice number rather than date, and fails the first PDF download. The agent has to notice.
 
 ## Design decisions
 
@@ -73,7 +97,7 @@ The sandbox is a second database (`.data/sandbox.db`) and a set of ordinary Next
 | Models | Gemini via `@google/genai`. Reasoning `gemini-3.8-flash`. Action and fast `gemini-3.5-flash-lite`. Fallbacks `gemini-3.5-flash`, `gemini-3.5-flash-lite`, `gemini-3.1-flash-lite`, `gemini-flash-lite-latest`. |
 | Browser | Playwright, Chromium. |
 | PDFs | `pdf-lib` to generate the sandbox invoices, `pdfjs-dist` to read them. |
-| App | Next.js 16 App Router, React 19, Tailwind v4, SQLite. |
+| App | Next.js 16 App Router, React 19, Tailwind v4, Neon Postgres. |
 | UI | React Three Fiber, GSAP, Motion. |
 | Tools | MCP, both directions. See below. |
 

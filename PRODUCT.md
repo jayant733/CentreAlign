@@ -26,7 +26,7 @@ The mechanism a neighbouring "agent demo" cannot truthfully copy: every step is 
 ## Operating Context
 
 - Sandbox company: Northwind Manufacturing. Systems: Vendor Invoice Portal (`/sandbox/portal`, login, consent overlay, paging, PDFs) and NimbusERP accounts payable (`/sandbox/erp`, strict bill form, read-only REST API, payments endpoint).
-- Runs are enqueued by the web API and executed by a separate worker process; all state is in SQLite, streamed to the UI.
+- Runs are enqueued by the web API and executed by a separate worker process; all state is in Neon Postgres, streamed to the UI.
 - Human-in-the-loop: approvals for dangerous actions (payments) and clarifying questions arrive as interventions the UI must answer.
 - Headline demo task: "Find the latest invoice from Acme, extract the total amount payable and the due date, enter it into NimbusERP, and tell me once it is done." First verified run: 3/3 steps, 34 actions, ~3.7 min, bill BILL-0013 for INV-ACM-2012, $18,415.49, due 2026-10-22.
 

@@ -434,6 +434,19 @@ async function renderInvoicePdf(inv: InvoiceSeed, vendor: VendorSeed): Promise<U
   return doc.save();
 }
 
+/** Rewrites the invoice PDFs without touching the ledger. Used on container start. */
+export async function writeInvoiceFiles(): Promise<number> {
+  fs.mkdirSync(INVOICE_DIR, { recursive: true });
+  fs.mkdirSync(config.workspaceDir, { recursive: true });
+  fs.mkdirSync(config.artifactsDir, { recursive: true });
+  for (const inv of INVOICES) {
+    const vendor = VENDORS.find((v) => v.slug === inv.vendor)!;
+    const bytes = await renderInvoicePdf(inv, vendor);
+    fs.writeFileSync(path.join(INVOICE_DIR, `${inv.number}.pdf`), bytes);
+  }
+  return INVOICES.length;
+}
+
 export async function seedSandbox(): Promise<{ vendors: number; invoices: number; bills: number }> {
   fs.mkdirSync(INVOICE_DIR, { recursive: true });
   fs.mkdirSync(config.workspaceDir, { recursive: true });
@@ -441,23 +454,24 @@ export async function seedSandbox(): Promise<{ vendors: number; invoices: number
 
   // Full reset so every demo and eval run starts from identical state.
   for (const table of [
-    "payments", "bills", "audit_log", "invoices", "vendors",
-    "portal_sessions", "portal_users", "fault_state",
+    "sandbox.payments", "sandbox.bills", "sandbox.audit_log", "sandbox.invoices", "sandbox.vendors",
+    "sandbox.portal_sessions", "sandbox.portal_users", "sandbox.fault_state",
   ]) {
     sdb.prepare(`DELETE FROM ${table}`).run();
   }
   resetFaults();
 
   sdb
-    .prepare(`INSERT INTO portal_users (email, password, name) VALUES (?, ?, ?)`)
+    .prepare(`INSERT INTO sandbox.portal_users (email, password, name) VALUES (?, ?, ?)`)
     .run(config.sandbox.portalUser, config.sandbox.portalPassword, "Priya Raman");
 
   const vendorIds = new Map<string, number>();
   for (const v of VENDORS) {
     const res = sdb
       .prepare(
-        `INSERT INTO vendors (name, slug, email, payment_terms, category)
-         VALUES (?, ?, ?, ?, ?)`,
+        `INSERT INTO sandbox.vendors (name, slug, email, payment_terms, category)
+         VALUES (?, ?, ?, ?, ?)
+         RETURNING id`,
       )
       .run(v.name, v.slug, v.email, v.paymentTerms, v.category);
     vendorIds.set(v.slug, Number(res.lastInsertRowid));
@@ -474,7 +488,7 @@ export async function seedSandbox(): Promise<{ vendors: number; invoices: number
 
     sdb
       .prepare(
-        `INSERT INTO invoices (number, vendor_id, po_number, issue_date, due_date,
+        `INSERT INTO sandbox.invoices (number, vendor_id, po_number, issue_date, due_date,
                                subtotal_cents, tax_cents, total_cents, currency, status, pdf_file)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'USD', ?, ?)`,
       )
@@ -495,7 +509,7 @@ export async function seedSandbox(): Promise<{ vendors: number; invoices: number
   for (const b of EXISTING_BILLS) {
     sdb
       .prepare(
-        `INSERT INTO bills (vendor_name, invoice_number, amount_cents, currency, due_date,
+        `INSERT INTO sandbox.bills (vendor_name, invoice_number, amount_cents, currency, due_date,
                             status, notes, created_by, created_at)
          VALUES (?, ?, ?, 'USD', ?, ?, ?, 'priya.raman', ?)`,
       )

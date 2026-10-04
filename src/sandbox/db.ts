@@ -1,104 +1,17 @@
-import { DatabaseSync } from "node:sqlite";
-import fs from "node:fs";
-import path from "node:path";
-import { config } from "@/agent/config";
+import { statement } from "@/db/client";
 
 /**
- * The simulated company's own database. Kept separate from the agent's state
- * database on purpose: the agent must reach this data the way an employee
- * would, through the portal UI or the ERP API, never by reading its own tables.
+ * The simulated company's own database, in the `sandbox` schema. Kept separate
+ * from the agent's state on purpose: the agent must reach this data the way an
+ * employee would, through the portal UI or the ERP API, never by reading its
+ * own tables.
  */
 
-const SCHEMA = `
-CREATE TABLE IF NOT EXISTS vendors (
-  id             INTEGER PRIMARY KEY AUTOINCREMENT,
-  name           TEXT NOT NULL UNIQUE,
-  slug           TEXT NOT NULL UNIQUE,
-  email          TEXT NOT NULL,
-  payment_terms  TEXT NOT NULL,
-  category       TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS invoices (
-  id           INTEGER PRIMARY KEY AUTOINCREMENT,
-  number       TEXT NOT NULL UNIQUE,
-  vendor_id    INTEGER NOT NULL REFERENCES vendors(id),
-  po_number    TEXT,
-  issue_date   TEXT NOT NULL,
-  due_date     TEXT NOT NULL,
-  subtotal_cents INTEGER NOT NULL,
-  tax_cents    INTEGER NOT NULL,
-  total_cents  INTEGER NOT NULL,
-  currency     TEXT NOT NULL DEFAULT 'USD',
-  status       TEXT NOT NULL,
-  pdf_file     TEXT
-);
-
--- NimbusERP accounts-payable ledger. This is what the agent has to write into.
-CREATE TABLE IF NOT EXISTS bills (
-  id              INTEGER PRIMARY KEY AUTOINCREMENT,
-  vendor_name     TEXT NOT NULL,
-  invoice_number  TEXT NOT NULL UNIQUE,
-  amount_cents    INTEGER NOT NULL,
-  currency        TEXT NOT NULL DEFAULT 'USD',
-  due_date        TEXT NOT NULL,
-  status          TEXT NOT NULL DEFAULT 'pending_approval',
-  notes           TEXT,
-  created_by      TEXT NOT NULL,
-  created_at      INTEGER NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS payments (
-  id            INTEGER PRIMARY KEY AUTOINCREMENT,
-  bill_id       INTEGER NOT NULL REFERENCES bills(id),
-  amount_cents  INTEGER NOT NULL,
-  reference     TEXT NOT NULL,
-  approved_by   TEXT NOT NULL,
-  created_at    INTEGER NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS audit_log (
-  id      INTEGER PRIMARY KEY AUTOINCREMENT,
-  entity  TEXT NOT NULL,
-  action  TEXT NOT NULL,
-  actor   TEXT NOT NULL,
-  detail  TEXT,
-  ts      INTEGER NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS portal_users (
-  email    TEXT PRIMARY KEY,
-  password TEXT NOT NULL,
-  name     TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS portal_sessions (
-  token      TEXT PRIMARY KEY,
-  email      TEXT NOT NULL,
-  created_at INTEGER NOT NULL
-);
-
--- Tracks deliberately injected faults so they are reproducible: the first
--- request for a given key fails, later ones succeed.
-CREATE TABLE IF NOT EXISTS fault_state (
-  key   TEXT PRIMARY KEY,
-  hits  INTEGER NOT NULL DEFAULT 0
-);
-`;
-
-function open(): DatabaseSync {
-  fs.mkdirSync(path.dirname(config.sandboxDbPath), { recursive: true });
-  const db = new DatabaseSync(config.sandboxDbPath);
-  db.exec("PRAGMA journal_mode = WAL");
-  db.exec("PRAGMA busy_timeout = 5000");
-  db.exec("PRAGMA foreign_keys = ON");
-  db.exec(SCHEMA);
-  return db;
-}
-
-const globalRef = globalThis as unknown as { __sandboxDb?: DatabaseSync };
-export const sdb: DatabaseSync =
-  globalRef.__sandboxDb ?? (globalRef.__sandboxDb = open());
+export const sdb = {
+  prepare(sql: string) {
+    return statement(sql);
+  },
+};
 
 /* -------------------------------------------------------------------------- */
 /* Shapes                                                                     */
@@ -176,7 +89,7 @@ export function parseMoneyToCents(input: string | number): number | null {
 
 const INVOICE_SELECT = `
   SELECT i.*, v.name AS vendor_name
-  FROM invoices i JOIN vendors v ON v.id = i.vendor_id
+  FROM sandbox.invoices i JOIN sandbox.vendors v ON v.id = i.vendor_id
 `;
 
 function toInvoice(r: Row): Invoice {
@@ -210,11 +123,11 @@ function toVendor(r: Row): Vendor {
 
 export const vendors = {
   all(): Vendor[] {
-    return (sdb.prepare(`SELECT * FROM vendors ORDER BY name`).all() as Row[]).map(toVendor);
+    return (sdb.prepare(`SELECT * FROM sandbox.vendors ORDER BY name`).all() as Row[]).map(toVendor);
   },
   byName(name: string): Vendor | null {
     const r = sdb
-      .prepare(`SELECT * FROM vendors WHERE lower(name) = lower(?) OR lower(slug) = lower(?)`)
+      .prepare(`SELECT * FROM sandbox.vendors WHERE lower(name) = lower(?::text) OR lower(slug) = lower(?::text)`)
       .get(name, name) as Row | undefined;
     return r ? toVendor(r) : null;
   },
@@ -222,7 +135,7 @@ export const vendors = {
    *  "Acme Industrial Supply". */
   search(q: string): Vendor[] {
     return (
-      sdb.prepare(`SELECT * FROM vendors WHERE lower(name) LIKE '%' || lower(?) || '%' ORDER BY name`)
+      sdb.prepare(`SELECT * FROM sandbox.vendors WHERE lower(name) LIKE '%' || lower(?::text) || '%' ORDER BY name`)
         .all(q) as Row[]
     ).map(toVendor);
   },
@@ -236,7 +149,7 @@ export const invoices = {
   },
   byNumber(number: string): Invoice | null {
     const r = sdb
-      .prepare(`${INVOICE_SELECT} WHERE lower(i.number) = lower(?)`)
+      .prepare(`${INVOICE_SELECT} WHERE lower(i.number) = lower(?::text)`)
       .get(number) as Row | undefined;
     return r ? toInvoice(r) : null;
   },
@@ -269,15 +182,15 @@ function toBill(r: Row): Bill {
 
 export const bills = {
   all(): Bill[] {
-    return (sdb.prepare(`SELECT * FROM bills ORDER BY created_at DESC`).all() as Row[]).map(toBill);
+    return (sdb.prepare(`SELECT * FROM sandbox.bills ORDER BY created_at DESC`).all() as Row[]).map(toBill);
   },
   get(id: number): Bill | null {
-    const r = sdb.prepare(`SELECT * FROM bills WHERE id = ?`).get(id) as Row | undefined;
+    const r = sdb.prepare(`SELECT * FROM sandbox.bills WHERE id = ?`).get(id) as Row | undefined;
     return r ? toBill(r) : null;
   },
   byInvoiceNumber(invoiceNumber: string): Bill | null {
     const r = sdb
-      .prepare(`SELECT * FROM bills WHERE lower(invoice_number) = lower(?)`)
+      .prepare(`SELECT * FROM sandbox.bills WHERE lower(invoice_number) = lower(?::text)`)
       .get(invoiceNumber) as Row | undefined;
     return r ? toBill(r) : null;
   },
@@ -293,9 +206,10 @@ export const bills = {
     const ts = Date.now();
     const res = sdb
       .prepare(
-        `INSERT INTO bills (vendor_name, invoice_number, amount_cents, currency, due_date,
+        `INSERT INTO sandbox.bills (vendor_name, invoice_number, amount_cents, currency, due_date,
                             status, notes, created_by, created_at)
-         VALUES (?, ?, ?, ?, ?, 'pending_approval', ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, 'pending_approval', ?, ?, ?)
+         RETURNING id`,
       )
       .run(
         input.vendorName,
@@ -311,7 +225,7 @@ export const bills = {
     return bills.get(Number(res.lastInsertRowid))!;
   },
   markPaid(id: number): void {
-    sdb.prepare(`UPDATE bills SET status = 'paid' WHERE id = ?`).run(id);
+    sdb.prepare(`UPDATE sandbox.bills SET status = 'paid' WHERE id = ?`).run(id);
   },
 };
 
@@ -320,8 +234,9 @@ export const payments = {
     const reference = `PAY-${Date.now().toString(36).toUpperCase()}`;
     const res = sdb
       .prepare(
-        `INSERT INTO payments (bill_id, amount_cents, reference, approved_by, created_at)
-         VALUES (?, ?, ?, ?, ?)`,
+        `INSERT INTO sandbox.payments (bill_id, amount_cents, reference, approved_by, created_at)
+         VALUES (?, ?, ?, ?, ?)
+         RETURNING id`,
       )
       .run(billId, amountCents, reference, approvedBy, Date.now());
     bills.markPaid(billId);
@@ -329,18 +244,18 @@ export const payments = {
     return { id: Number(res.lastInsertRowid), reference };
   },
   forBill(billId: number) {
-    return sdb.prepare(`SELECT * FROM payments WHERE bill_id = ?`).all(billId) as Row[];
+    return sdb.prepare(`SELECT * FROM sandbox.payments WHERE bill_id = ?`).all(billId) as Row[];
   },
 };
 
 export const audit = {
   log(entity: string, action: string, actor: string, detail?: string): void {
     sdb
-      .prepare(`INSERT INTO audit_log (entity, action, actor, detail, ts) VALUES (?, ?, ?, ?, ?)`)
+      .prepare(`INSERT INTO sandbox.audit_log (entity, action, actor, detail, ts) VALUES (?, ?, ?, ?, ?)`)
       .run(entity, action, actor, detail ?? null, Date.now());
   },
   recent(limit = 50): Row[] {
-    return sdb.prepare(`SELECT * FROM audit_log ORDER BY ts DESC LIMIT ?`).all(limit) as Row[];
+    return sdb.prepare(`SELECT * FROM sandbox.audit_log ORDER BY ts DESC LIMIT ?`).all(limit) as Row[];
   },
 };
 
@@ -351,14 +266,14 @@ export const audit = {
 export const portalAuth = {
   verify(email: string, password: string): { email: string; name: string } | null {
     const r = sdb
-      .prepare(`SELECT * FROM portal_users WHERE lower(email) = lower(?) AND password = ?`)
+      .prepare(`SELECT * FROM sandbox.portal_users WHERE lower(email) = lower(?::text) AND password = ?`)
       .get(email, password) as Row | undefined;
     return r ? { email: String(r.email), name: String(r.name) } : null;
   },
   createSession(email: string): string {
     const token = `sess_${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
     sdb
-      .prepare(`INSERT INTO portal_sessions (token, email, created_at) VALUES (?, ?, ?)`)
+      .prepare(`INSERT INTO sandbox.portal_sessions (token, email, created_at) VALUES (?, ?, ?)`)
       .run(token, email, Date.now());
     return token;
   },
@@ -366,8 +281,8 @@ export const portalAuth = {
     if (!token) return null;
     const r = sdb
       .prepare(
-        `SELECT u.email, u.name FROM portal_sessions s
-         JOIN portal_users u ON lower(u.email) = lower(s.email) WHERE s.token = ?`,
+        `SELECT u.email, u.name FROM sandbox.portal_sessions s
+         JOIN sandbox.portal_users u ON lower(u.email) = lower(s.email) WHERE s.token = ?`,
       )
       .get(token) as Row | undefined;
     return r ? { email: String(r.email), name: String(r.name) } : null;
@@ -384,11 +299,11 @@ export const portalAuth = {
  * path is exercised on every run and in the eval suite, not just by luck.
  */
 export function shouldInjectFault(key: string, failures = 1): boolean {
-  const row = sdb.prepare(`SELECT hits FROM fault_state WHERE key = ?`).get(key) as Row | undefined;
+  const row = sdb.prepare(`SELECT hits FROM sandbox.fault_state WHERE key = ?`).get(key) as Row | undefined;
   const hits = Number(row?.hits ?? 0);
   sdb
     .prepare(
-      `INSERT INTO fault_state (key, hits) VALUES (?, 1)
+      `INSERT INTO sandbox.fault_state (key, hits) VALUES (?, 1)
        ON CONFLICT(key) DO UPDATE SET hits = hits + 1`,
     )
     .run(key);
@@ -396,5 +311,5 @@ export function shouldInjectFault(key: string, failures = 1): boolean {
 }
 
 export function resetFaults(): void {
-  sdb.prepare(`DELETE FROM fault_state`).run();
+  sdb.prepare(`DELETE FROM sandbox.fault_state`).run();
 }

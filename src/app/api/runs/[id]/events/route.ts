@@ -9,7 +9,7 @@ const POLL_MS = 600;
 /**
  * Live trace as Server-Sent Events.
  *
- * The worker writes events to SQLite from another process, so this tails the
+ * The worker writes events to Postgres from another process, so this tails the
  * table rather than subscribing to anything in memory. `?after=<id>` resumes
  * from a known event, which is also what EventSource reconnection sends via
  * Last-Event-ID.

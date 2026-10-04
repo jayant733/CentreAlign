@@ -38,8 +38,8 @@ class RecordingGateway implements HumanGateway {
 function resetBill(invoiceNumber: string) {
   const bill = bills.byInvoiceNumber(invoiceNumber);
   if (!bill) return;
-  sdb.prepare(`DELETE FROM payments WHERE bill_id = ?`).run(bill.id);
-  sdb.prepare(`DELETE FROM bills WHERE id = ?`).run(bill.id);
+  sdb.prepare(`DELETE FROM sandbox.payments WHERE bill_id = ?`).run(bill.id);
+  sdb.prepare(`DELETE FROM sandbox.bills WHERE id = ?`).run(bill.id);
 }
 
 function ensureMatchingBill(invoiceNumber: string) {

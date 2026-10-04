@@ -1,0 +1,19 @@
+services:
+  praxis:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      GEMINI_API_KEY: ${GEMINI_API_KEY:?set GEMINI_API_KEY}
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
+      PRAXIS_HEADLESS: "true"
+      # The browser inside the container reaches the app on localhost.
+      # If you put a public URL in front of this, set PRAXIS_BASE_URL to that URL.
+      PRAXIS_BASE_URL: ${PRAXIS_BASE_URL:-http://localhost:3000}
+      PORT: "3000"
+    volumes:
+      # Invoice PDFs, screenshots and the workspace. The databases are in Neon.
+      - praxis_data:/app/.data
+
+volumes:
+  praxis_data:

@@ -24,11 +24,9 @@ export const config = {
   root,
   dataDir,
 
-  /** Agent state: runs, events, steps, memory, approvals. */
-  agentDbPath: path.join(dataDir, "praxis.db"),
-  /** The simulated company's data. Deliberately a separate database so the
-   *  agent's own bookkeeping can never be confused with company records. */
-  sandboxDbPath: path.join(dataDir, "sandbox.db"),
+  /** Neon connection string. Agent state and the sandbox live in two schemas
+   *  of this one database. Never commit the value. */
+  databaseUrl: str("DATABASE_URL", ""),
 
   /** Screenshots and downloads land under /public so the UI can show them. */
   artifactsDir: path.join(root, "public", "artifacts"),
