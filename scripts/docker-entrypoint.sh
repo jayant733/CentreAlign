@@ -6,12 +6,23 @@ set -euo pipefail
 
 mkdir -p /app/.data /app/.data/workspace /app/.data/sandbox/invoices /app/public/artifacts
 
+# Hosts like Railway and Render pick the port. The agent's browser runs in
+# this same container, so it must dial that port, not a hard-coded 3000.
+# Any localhost value is rewritten; a real public URL is left alone.
+export PORT="${PORT:-3000}"
+case "${PRAXIS_BASE_URL:-}" in
+  ""|http://localhost*|http://127.0.0.1*)
+    export PRAXIS_BASE_URL="http://127.0.0.1:${PORT}"
+    ;;
+esac
+echo "[praxis] web on port ${PORT}, agent dials ${PRAXIS_BASE_URL}"
+
 npx tsx scripts/seed-if-empty.ts
 
 npx tsx scripts/worker.ts &
 worker_pid=$!
 
-npx next start -H 0.0.0.0 -p "${PORT:-3000}" &
+npx next start -H 0.0.0.0 -p "${PORT}" &
 web_pid=$!
 
 shutdown() {

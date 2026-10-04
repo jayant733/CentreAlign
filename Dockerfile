@@ -16,11 +16,10 @@ RUN sed -i 's/\r$//' scripts/docker-entrypoint.sh \
   && npm run build \
   && mkdir -p .data public/artifacts
 
-ENV PORT=3000
 ENV NODE_ENV=production
 ENV PRAXIS_HEADLESS=true
-# Playwright runs in this same container, so localhost is the Next server.
-ENV PRAXIS_BASE_URL=http://localhost:3000
+# PORT is honoured if the host sets it; the entrypoint defaults it to 3000
+# and points the agent's browser at the same port.
 
 EXPOSE 3000
 

@@ -52,11 +52,10 @@ docker run -d -p 3000:3000 \
   -v praxis_data:/app/.data \
   -e GEMINI_API_KEY="your_key" \
   -e DATABASE_URL="your_neon_url" \
-  -e PRAXIS_BASE_URL="http://localhost:3000" \
   --name praxis-app praxis
 ```
 
-Playwright's browser runs inside the container, so `PRAXIS_BASE_URL` should stay `http://localhost:3000` unless a proxy in front of the app is the only way the browser can reach it. If a proxy sits in front, disable response buffering for `/api/runs/*/events` or the live trail will arrive in one chunk at the end.
+Do not set `PRAXIS_BASE_URL` in Docker. The agent's browser runs inside the container and the entrypoint points it at whatever port the host assigned, so it works on Railway, Render and Fly without changes. If a proxy sits in front, disable response buffering for `/api/runs/*/events` or the live trail will arrive in one chunk at the end.
 
 ## What a run actually does
 
