@@ -43,9 +43,9 @@ function parse<T>(v: unknown, fallback: T): T {
 /* Runs                                                                       */
 /* -------------------------------------------------------------------------- */
 
-type RunRow = Record<string, unknown>;
+export type RunRow = Record<string, unknown>;
 
-function toRun(row: RunRow): RunRecord {
+export function toRun(row: RunRow): RunRecord {
   return {
     id: String(row.id),
     goal: String(row.goal),
@@ -153,7 +153,7 @@ export const runs = {
 /* Steps                                                                      */
 /* -------------------------------------------------------------------------- */
 
-function toStep(row: RunRow): StepRecord {
+export function toStep(row: RunRow): StepRecord {
   return {
     runId: String(row.run_id),
     stepId: String(row.step_id),
@@ -242,18 +242,22 @@ export const events = {
   list(runId: string, afterId = 0, limit = 500): EventRecord[] {
     const rows = db(`SELECT * FROM agent.events WHERE run_id = ? AND id > ? ORDER BY id ASC LIMIT ?`)
       .all(runId, afterId, limit) as RunRow[];
-    return rows.map((row) => ({
-      id: Number(row.id),
-      runId: String(row.run_id),
-      ts: Number(row.ts),
-      type: String(row.type) as EventRecord["type"],
-      stepId: (row.step_id as string | null) ?? null,
-      level: String(row.level ?? "info") as EventRecord["level"],
-      message: String(row.message),
-      data: parse<unknown>(row.data, null),
-    }));
+    return rows.map(toEvent);
   },
 };
+
+export function toEvent(row: RunRow): EventRecord {
+  return {
+    id: Number(row.id),
+    runId: String(row.run_id),
+    ts: Number(row.ts),
+    type: String(row.type) as EventRecord["type"],
+    stepId: (row.step_id as string | null) ?? null,
+    level: String(row.level ?? "info") as EventRecord["level"],
+    message: String(row.message),
+    data: parse<unknown>(row.data, null),
+  };
+}
 
 /* -------------------------------------------------------------------------- */
 /* Memory                                                                     */
@@ -278,13 +282,17 @@ export const memory = {
   all(runId: string): MemoryFact[] {
     const rows = db(`SELECT key, value, source FROM agent.memory WHERE run_id = ? ORDER BY updated_at ASC`)
       .all(runId) as RunRow[];
-    return rows.map((r) => ({
-      key: String(r.key),
-      value: String(r.value),
-      source: (r.source as string | null) ?? undefined,
-    }));
+    return rows.map(toFact);
   },
 };
+
+export function toFact(r: RunRow): MemoryFact {
+  return {
+    key: String(r.key),
+    value: String(r.value),
+    source: (r.source as string | null) ?? undefined,
+  };
+}
 
 /* -------------------------------------------------------------------------- */
 /* Recipes (cross-run semantic memory)                                        */
@@ -340,7 +348,7 @@ export const recipes = {
 /* Interventions (approvals and questions)                                    */
 /* -------------------------------------------------------------------------- */
 
-function toIntervention(row: RunRow): InterventionRecord {
+export function toIntervention(row: RunRow): InterventionRecord {
   return {
     id: String(row.id),
     runId: String(row.run_id),
@@ -436,12 +444,16 @@ export const artifacts = {
   forRun(runId: string): Artifact[] {
     const rows = db(`SELECT * FROM agent.artifacts WHERE run_id = ? ORDER BY ts ASC`)
       .all(runId) as RunRow[];
-    return rows.map((r) => ({
-      id: String(r.id),
-      kind: String(r.kind) as Artifact["kind"],
-      label: String(r.label),
-      url: (r.url as string | null) ?? undefined,
-      path: (r.path as string | null) ?? undefined,
-    }));
+    return rows.map(toArtifact);
   },
 };
+
+export function toArtifact(r: RunRow): Artifact {
+  return {
+    id: String(r.id),
+    kind: String(r.kind) as Artifact["kind"],
+    label: String(r.label),
+    url: (r.url as string | null) ?? undefined,
+    path: (r.path as string | null) ?? undefined,
+  };
+}

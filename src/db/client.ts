@@ -26,8 +26,6 @@ interface Fail {
 
 type Reply = Ok | Fail;
 
-let worker: Worker | undefined;
-
 function getWorker(): Worker {
   const slot = globalThis as unknown as { __praxisPgWorker?: Worker };
   if (slot.__praxisPgWorker) return slot.__praxisPgWorker;
@@ -46,11 +44,9 @@ function getWorker(): Worker {
   });
   next.on("exit", (code) => {
     if (slot.__praxisPgWorker === next) slot.__praxisPgWorker = undefined;
-    worker = undefined;
     if (code !== 0) console.error(`[praxis] database worker exited with code ${code}`);
   });
   slot.__praxisPgWorker = next;
-  worker = next;
   return next;
 }
 
@@ -82,9 +78,31 @@ function receiveSoon(port: WorkerMessagePort): { message: unknown } | undefined 
   return undefined;
 }
 
-export function statement(sql: string) {
+function numbered(sql: string): string {
   let n = 0;
-  const text = sql.replace(/\?/g, () => `$${++n}`);
+  return sql.replace(/\?/g, () => `$${++n}`);
+}
+
+/**
+ * Non-blocking variant for the web server. A request handler that blocks the
+ * event loop for a round trip to Neon stalls every other request, so pages and
+ * API routes await this instead. The worker keeps the synchronous API: it runs
+ * one task at a time and has nothing else to do while it waits.
+ */
+export function query(sql: string, params: unknown[] = []): Promise<Ok> {
+  const { port1, port2 } = new MessageChannel();
+  return new Promise((resolve, reject) => {
+    port1.once("message", (message: Reply) => {
+      port1.close();
+      if ("error" in message && message.error) reject(new Error(message.error));
+      else resolve(message as Ok);
+    });
+    getWorker().postMessage({ sql: numbered(sql), params, port: port2 }, [port2]);
+  });
+}
+
+export function statement(sql: string) {
+  const text = numbered(sql);
   return {
     run(...params: unknown[]) {
       const { rows, rowCount } = exec(text, params);

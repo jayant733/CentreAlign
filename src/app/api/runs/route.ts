@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { nanoid } from "nanoid";
 import { runs } from "@/agent/db";
+import { read } from "@/agent/db-read";
 
 export const runtime = "nodejs";
 
@@ -31,5 +32,5 @@ export async function POST(req: Request) {
 }
 
 export async function GET() {
-  return NextResponse.json({ runs: runs.list(60) });
+  return NextResponse.json({ runs: await read.runs(60) });
 }

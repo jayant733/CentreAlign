@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { runs } from "@/agent/db";
+import { read } from "@/agent/db-read";
 import { CaseList } from "@/components/mission/CaseList";
 import { NewCase } from "@/components/mission/NewCase";
 import { SiteHeader } from "@/components/SiteHeader";
@@ -10,7 +10,7 @@ export const metadata: Metadata = { title: "Open a case — Praxis" };
 
 export default async function MissionPage({ searchParams }: { searchParams: Promise<{ goal?: string }> }) {
   const { goal } = await searchParams;
-  const recent = runs.list(6);
+  const recent = await read.runs(6);
 
   return (
     <div className="room">

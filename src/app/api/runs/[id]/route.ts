@@ -1,22 +1,15 @@
 import { NextResponse } from "next/server";
-import { artifacts, events, interventions, memory, runs, steps } from "@/agent/db";
+import { events, interventions, runs } from "@/agent/db";
+import { read } from "@/agent/db-read";
 
 export const runtime = "nodejs";
 
 /** Everything the UI needs to render a run in one request. */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const run = runs.get(id);
-  if (!run) return NextResponse.json({ error: "No such run." }, { status: 404 });
-
-  return NextResponse.json({
-    run,
-    steps: steps.list(id),
-    facts: memory.all(id),
-    artifacts: artifacts.forRun(id),
-    pending: interventions.pendingForRun(id),
-    events: events.list(id, 0, 1000),
-  });
+  const snap = await read.snapshot(id, 1000);
+  if (!snap) return NextResponse.json({ error: "No such run." }, { status: 404 });
+  return NextResponse.json(snap);
 }
 
 /** Cancels a run. The worker notices on its next poll. */

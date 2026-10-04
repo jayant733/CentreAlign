@@ -304,7 +304,7 @@ export function shouldInjectFault(key: string, failures = 1): boolean {
   sdb
     .prepare(
       `INSERT INTO sandbox.fault_state (key, hits) VALUES (?, 1)
-       ON CONFLICT(key) DO UPDATE SET hits = hits + 1`,
+       ON CONFLICT(key) DO UPDATE SET hits = sandbox.fault_state.hits + 1`,
     )
     .run(key);
   return hits < failures;

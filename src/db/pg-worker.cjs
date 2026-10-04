@@ -32,7 +32,7 @@ function scrub(message) {
 
 const pool = new Pool({
   connectionString: connectionString(),
-  max: 4,
+  max: 8,
   ssl: { rejectUnauthorized: true },
   idleTimeoutMillis: 20_000,
   connectionTimeoutMillis: 20_000,
@@ -204,9 +204,11 @@ function ensure() {
 }
 
 async function bootstrap() {
+  // One multi-statement round trip. Sending each CREATE separately costs a
+  // network hop apiece and made the first query take several seconds.
   const client = await pool.connect();
   try {
-    for (const stmt of SCHEMA) await client.query(stmt);
+    await client.query(SCHEMA.join(";\n"));
   } finally {
     client.release();
   }
@@ -221,7 +223,10 @@ parentPort.on("message", async (msg) => {
     const message = err instanceof Error ? err.message : String(err);
     msg.port.postMessage({ error: scrub(message) });
   } finally {
-    Atomics.store(msg.signal, 0, 1);
-    Atomics.notify(msg.signal, 0, 1);
+    // Only the synchronous caller passes a signal to wake on.
+    if (msg.signal) {
+      Atomics.store(msg.signal, 0, 1);
+      Atomics.notify(msg.signal, 0, 1);
+    }
   }
 });

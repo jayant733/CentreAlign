@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { runs } from "@/agent/db";
+import { read } from "@/agent/db-read";
 import { ButtonLink } from "@/components/evidence";
 import { CaseList } from "@/components/mission/CaseList";
 import { SiteHeader } from "@/components/SiteHeader";
@@ -7,7 +7,8 @@ import { SiteHeader } from "@/components/SiteHeader";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Case files — Praxis" };
 
-export default function RunsPage() {
+export default async function RunsPage() {
+  const all = await read.runs(100);
   return (
     <div className="room">
       <SiteHeader />
@@ -21,7 +22,7 @@ export default function RunsPage() {
           verdict.
         </p>
         <div className="mt-12">
-          <CaseList runs={runs.list(100)} empty="No cases yet." />
+          <CaseList runs={all} empty="No cases yet." />
         </div>
       </main>
     </div>

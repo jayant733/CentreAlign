@@ -1,10 +1,10 @@
-import { events, runs } from "@/agent/db";
+import { read } from "@/agent/db-read";
 import { TERMINAL_RUN_STATUSES } from "@/agent/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const POLL_MS = 600;
+const POLL_MS = 1000;
 
 /**
  * Live trace as Server-Sent Events.
@@ -16,7 +16,7 @@ const POLL_MS = 600;
  */
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  if (!runs.get(id)) return new Response("No such run.", { status: 404 });
+  if (!(await read.run(id))) return new Response("No such run.", { status: 404 });
 
   const url = new URL(req.url);
   let after = Number(req.headers.get("last-event-id") ?? url.searchParams.get("after") ?? 0) || 0;
@@ -37,22 +37,33 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         controller.close();
       };
 
-      const tick = () => {
-        for (const e of events.list(id, after, 200)) {
-          after = e.id;
-          send(`id: ${e.id}\nevent: trace\ndata: ${JSON.stringify(e)}\n\n`);
-        }
-        const run = runs.get(id);
-        if (!run || TERMINAL_RUN_STATUSES.includes(run.status)) {
-          send(`event: end\ndata: ${JSON.stringify({ status: run?.status })}\n\n`);
-          close();
+      // One tick in flight at a time: a slow round trip must not pile up.
+      let busy = false;
+      const tick = async () => {
+        if (busy || closed) return;
+        busy = true;
+        try {
+          const { events, run } = await read.tail(id, after);
+          if (closed) return;
+          for (const e of events) {
+            after = e.id;
+            send(`id: ${e.id}\nevent: trace\ndata: ${JSON.stringify(e)}\n\n`);
+          }
+          if (!run || TERMINAL_RUN_STATUSES.includes(run.status)) {
+            send(`event: end\ndata: ${JSON.stringify({ status: run?.status })}\n\n`);
+            close();
+          }
+        } catch (err) {
+          console.error("[events] tail failed:", err instanceof Error ? err.message : err);
+        } finally {
+          busy = false;
         }
       };
 
-      const timer = setInterval(tick, POLL_MS);
+      const timer = setInterval(() => void tick(), POLL_MS);
       const heartbeat = setInterval(() => send(": keep-alive\n\n"), 15_000);
       req.signal.addEventListener("abort", close);
-      tick();
+      void tick();
     },
   });
 
